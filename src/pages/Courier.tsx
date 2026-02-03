@@ -15,9 +15,6 @@ export default function CourierPage() {
   const [orderAddress, setOrderAddress] = useState("");
   const [events, setEvents] = useState<any[]>([]);
 
-  // ----------------------------------------
-  // Provider / Program
-  // ----------------------------------------
   const provider = useMemo(() => {
     if (!wallet.connected || !wallet.publicKey) return null;
     return new AnchorProvider(connection, wallet as any, { commitment: "confirmed" });
@@ -28,14 +25,11 @@ export default function CourierPage() {
     return new Program(IDL, provider);
   }, [provider]);
 
-  // ----------------------------------------
   // Event listener
-  // ----------------------------------------
   useEffect(() => {
     if (!program) return;
 
     const parser = new EventParser(program.programId, program.coder);
-
     const subId = connection.onLogs(
       program.programId,
       (logs) => {
@@ -47,9 +41,7 @@ export default function CourierPage() {
       "confirmed"
     );
 
-    return () => {
-      connection.removeOnLogsListener(subId);
-    };
+    return () => connection.removeOnLogsListener(subId);
   }, [program, connection]);
 
   // ----------------------------------------
@@ -89,36 +81,32 @@ export default function CourierPage() {
     }
   };
 
-  // ----------------------------------------
-  // UI
-  // ----------------------------------------
   return (
-    <div style={{ padding: 24 }}>
-      <h1>🚴 Courier</h1>
-
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <WalletMultiButton />
 
-      <div style={{ marginTop: 16 }}>
+      <div style={{ display: "flex", gap: 8 }}>
         <input
-          style={{ width: 420 }}
-          placeholder="Order account address (PDA)"
+          style={{ flex: 1, padding: 8, borderRadius: 4, border: "1px solid #ccc" }}
+          placeholder="Order PDA"
           value={orderAddress}
           onChange={(e) => setOrderAddress(e.target.value)}
         />
+        <button onClick={acceptOrder} style={{ padding: "8px 16px", borderRadius: 4, backgroundColor: "#1976d2", color: "#fff", border: "none" }}>Accept</button>
+        <button onClick={completeOrder} style={{ padding: "8px 16px", borderRadius: 4, backgroundColor: "#4caf50", color: "#fff", border: "none" }}>Complete</button>
       </div>
 
       <div style={{ marginTop: 16 }}>
-        <button onClick={acceptOrder}>Accept</button>
-        <button onClick={completeOrder} style={{ marginLeft: 8 }}>
-          Complete
-        </button>
+        <h3>📡 Events</h3>
+        <div style={{ maxHeight: 200, overflowY: "auto", border: "1px solid #ddd", padding: 8, borderRadius: 6, backgroundColor: "#fff" }}>
+          {events.length === 0 && <p style={{ color: "#999" }}>No events yet</p>}
+          {events.map((e, i) => (
+            <pre key={i} style={{ fontSize: 12, backgroundColor: "#f5f5f5", padding: 4, borderRadius: 4, marginBottom: 4 }}>
+              {JSON.stringify(e, null, 2)}
+            </pre>
+          ))}
+        </div>
       </div>
-
-      <h2 style={{ marginTop: 32 }}>📡 Events</h2>
-      {events.length === 0 && <p>No events yet</p>}
-      {events.map((e, i) => (
-        <pre key={i}>{JSON.stringify(e, null, 2)}</pre>
-      ))}
     </div>
   );
 }

@@ -1,8 +1,6 @@
-// src/pages/App.tsx
 import { useEffect, useMemo, useState } from "react";
-import { AnchorProvider, BN, EventParser, Program } from "@coral-xyz/anchor";
+import { Program, AnchorProvider, EventParser, BN } from "@coral-xyz/anchor";
 import type { Idl } from "@coral-xyz/anchor";
-
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { WalletMultiButton } from "@solana/wallet-adapter-react-ui";
 import { PublicKey, SystemProgram } from "@solana/web3.js";
@@ -10,16 +8,16 @@ import { PublicKey, SystemProgram } from "@solana/web3.js";
 import idlJson from "../idl/block_delivery.json";
 const IDL = idlJson as Idl;
 
-export default function App() {
-  const wallet = useWallet();
+export default function CustomerPage() {
   const { connection } = useConnection();
+  const wallet = useWallet();
 
-  const [events, setEvents] = useState<any[]>([]);
   const [amount, setAmount] = useState("1000");
+  const [events, setEvents] = useState<any[]>([]);
 
-  // -----------------------
+  // ----------------------------------------
   // Provider / Program
-  // -----------------------
+  // ----------------------------------------
   const provider = useMemo(() => {
     if (!wallet.connected || !wallet.publicKey) return null;
     return new AnchorProvider(connection, wallet as any, { commitment: "confirmed" });
@@ -30,14 +28,13 @@ export default function App() {
     return new Program(IDL, provider);
   }, [provider]);
 
-  // -----------------------
+  // ----------------------------------------
   // Event listener
-  // -----------------------
+  // ----------------------------------------
   useEffect(() => {
     if (!program) return;
 
     const parser = new EventParser(program.programId, program.coder);
-
     const subId = connection.onLogs(
       program.programId,
       (logs) => {
@@ -49,78 +46,107 @@ export default function App() {
       "confirmed"
     );
 
-    return () => {
-      connection.removeOnLogsListener(subId);
-    };
+    return () => connection.removeOnLogsListener(subId);
   }, [program, connection]);
 
-  // -----------------------
-  // Derive PDA using order_id
-  // -----------------------
-  const deriveOrderPda = async (orderId: BN) => {
-    if (!program || !wallet.publicKey) throw new Error("Wallet or program not ready");
+  // ----------------------------------------
+  // PDA (由合約 order_counter 自動生成)
+  // ----------------------------------------
+  const deriveOrderPda = async () => {
+    if (!wallet.publicKey || !program) throw new Error("Wallet or program not ready");
 
-    const orderIdBuf = orderId.toArrayLike(Buffer, "le", 8);
-    return PublicKey.findProgramAddress(
-      [Buffer.from("order"), wallet.publicKey.toBuffer(), orderIdBuf],
+    // fetch counter
+    const [counterPda] = PublicKey.findProgramAddressSync([Buffer.from("order_counter")], program.programId);
+    const counterAccount = await program.account.orderCounter.fetch(counterPda);
+    const orderIdBN = counterAccount.nextId;
+
+    const [orderPda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("order"), new BN(orderIdBN).toArrayLike(Buffer, "le", 8)],
       program.programId
     );
+
+    return { orderPda, orderIdBN };
   };
 
-  // -----------------------
-  // Create order (contract generates order_id)
-  // -----------------------
+  // ----------------------------------------
+  // createOrder
+  // ----------------------------------------
   const createOrder = async () => {
     if (!program || !wallet.publicKey) return;
 
+    const { orderPda, orderIdBN } = await deriveOrderPda();
     const amountBN = new BN(amount);
 
     try {
-      // call createOrder, order_id 由合約透過 counter 自動生成
       const tx = await program.methods
         .createOrder(amountBN)
         .accounts({
+          counter: (await PublicKey.findProgramAddressSync([Buffer.from("order_counter")], program.programId))[0],
+          order: orderPda,
           customer: wallet.publicKey,
           systemProgram: SystemProgram.programId,
         })
         .rpc();
 
       console.log("✅ createOrder tx:", tx);
+      console.log("Order PDA:", orderPda.toBase58());
+      console.log("Order ID:", orderIdBN.toString());
     } catch (err) {
       console.error("❌ createOrder failed:", err);
     }
   };
 
-  // -----------------------
+  // ----------------------------------------
   // UI
-  // -----------------------
+  // ----------------------------------------
   return (
-    <div style={{ padding: 24 }}>
-      <h1>📦 Block Delivery</h1>
-
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       <WalletMultiButton />
 
-      <div style={{ marginTop: 16 }}>
-        <div>
-          <label>Amount: </label>
-          <input
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </div>
-
-        <div style={{ marginTop: 16 }}>
-          <button onClick={createOrder} disabled={!wallet.connected}>
-            Create Order
-          </button>
-        </div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <label>Amount:</label>
+        <input
+          style={{ flex: 1, padding: 8, borderRadius: 4, border: "1px solid #ccc" }}
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+        <button
+          onClick={createOrder}
+          style={{ padding: "8px 16px", borderRadius: 4, backgroundColor: "#1976d2", color: "#fff", border: "none" }}
+        >
+          Create Order
+        </button>
       </div>
 
-      <h2 style={{ marginTop: 32 }}>📡 Events</h2>
-      {events.length === 0 && <p>No events yet</p>}
-      {events.map((e, i) => (
-        <pre key={i}>{JSON.stringify(e, null, 2)}</pre>
-      ))}
+      <div>
+        <h3>📡 Events</h3>
+        <div
+          style={{
+            maxHeight: 200,
+            overflowY: "auto",
+            border: "1px solid #ddd",
+            padding: 8,
+            borderRadius: 6,
+            backgroundColor: "#fff",
+          }}
+        >
+          {events.length === 0 && <p style={{ color: "#999" }}>No events yet</p>}
+          {events.map((e, i) => (
+            <pre
+              key={i}
+              style={{
+                fontSize: 12,
+                backgroundColor: "#f5f5f5",
+                padding: 4,
+                borderRadius: 4,
+                marginBottom: 4,
+              }}
+            >
+              {JSON.stringify(e, null, 2)}
+            </pre>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
