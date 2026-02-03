@@ -37,11 +37,6 @@
               },
               {
                 "kind": "account",
-                "path": "order.customer",
-                "account": "Order"
-              },
-              {
-                "kind": "account",
                 "path": "order.order_id",
                 "account": "Order"
               }
@@ -86,11 +81,6 @@
               },
               {
                 "kind": "account",
-                "path": "order.customer",
-                "account": "Order"
-              },
-              {
-                "kind": "account",
                 "path": "order.order_id",
                 "account": "Order"
               }
@@ -119,6 +109,32 @@
       ],
       "accounts": [
         {
+          "name": "counter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
           "name": "order",
           "writable": true,
           "pda": {
@@ -135,11 +151,8 @@
               },
               {
                 "kind": "account",
-                "path": "customer"
-              },
-              {
-                "kind": "arg",
-                "path": "order_id"
+                "path": "counter.next_id",
+                "account": "OrderCounter"
               }
             ]
           }
@@ -155,10 +168,6 @@
         }
       ],
       "args": [
-        {
-          "name": "order_id",
-          "type": "u64"
-        },
         {
           "name": "amount",
           "type": "u64"
@@ -177,7 +186,43 @@
         155,
         237
       ],
-      "accounts": [],
+      "accounts": [
+        {
+          "name": "counter",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  101,
+                  114
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
       "args": []
     }
   ],
@@ -193,6 +238,19 @@
         86,
         28,
         51
+      ]
+    },
+    {
+      "name": "OrderCounter",
+      "discriminator": [
+        124,
+        210,
+        2,
+        119,
+        178,
+        200,
+        59,
+        95
       ]
     }
   ],
@@ -338,6 +396,18 @@
           },
           {
             "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OrderCounter",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "next_id",
             "type": "u64"
           }
         ]
